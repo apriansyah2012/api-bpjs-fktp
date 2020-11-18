@@ -1,0 +1,8 @@
+Tutorial Integrasi Antrian FKTP 
+
+1. http://localhost/api-bpjs-v2/auth
+2. http://localhost/api-bpjs-v2/antrean
+3. http://localhost/api-bpjs-v2/antrean/status/INT/2020-06-29
+4. http://localhost/api-bpjs-v2/antrean/sisapeserta/00012345678/INT/2020-06-29
+5. http://localhost/api-bpjs-v2/antrean/batal
+6. http://localhost/api-bpjs-v2/peserta  (coming soon)
