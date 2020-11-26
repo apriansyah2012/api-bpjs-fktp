@@ -249,6 +249,15 @@ if ($method == 'POST' && !empty($header['x-username']) && !empty($header['x-toke
                         )
                     );
                 }
+			elseif(empty($decode['tanggalperiksa'])== $cek_kouta['jam_mulai'] ) {
+            
+				$response = array(
+                        'metadata' => array(
+                            'message' => "Poli '$cek_kouta[nm_poli]' TutuP",
+                            'code' => 201
+                        )
+                    );
+                }
 			elseif (!empty($decode['tanggalperiksa']) && !preg_match("/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$/",$decode['tanggalperiksa'])) {
                     $response = array(
                         'metadata' => array(
@@ -257,10 +266,12 @@ if ($method == 'POST' && !empty($header['x-username']) && !empty($header['x-toke
                         )
                     );
                 }
+				
+			
 			elseif (strtotime($decode['tanggalperiksa']) < strtotime(date('Y-m-d')) or strtotime($decode['tanggalperiksa']) >= strtotime(date('Y-m-d', strtotime('+' . HARI . ' day', strtotime(date('Y-m-d'))))) ) {
                     $response = array(
                         'metadata' => array(
-                            'message' => 'Tanggal Periksa Tidak Berlaku',
+                            'message' => 'Pendaftaran ke Poli Ini Sedang Tutup',
                             'code' => 201
                         )
                     );
@@ -270,9 +281,10 @@ if ($method == 'POST' && !empty($header['x-username']) && !empty($header['x-toke
 			else {
 				if (!empty($decode['nomorkartu']) && !empty($decode['nik']) && !empty($decode['kodepoli']) && !empty($decode['tanggalperiksa'])) {
                     $hari = hariindo($decode['tanggalperiksa']);
+					
                     $cek_kouta = fetch_array(bukaquery("SELECT jadwal.kuota - COALESCE((select COUNT(booking_registrasi.tanggal_periksa) FROM booking_registrasi 
                                 WHERE booking_registrasi.tanggal_periksa='$decode[tanggalperiksa]' AND booking_registrasi.kd_dokter=jadwal.kd_dokter )) as sisa_kouta, jadwal.kd_dokter, jadwal.kd_poli, 
-                                jadwal.jam_mulai + INTERVAL '10' MINUTE as jam_mulai, poliklinik.nm_poli,dokter.nm_dokter,
+                                jadwal.jam_mulai + INTERVAL '10' MINUTE as jam_waktu, poliklinik.nm_poli,dokter.nm_dokter,
                                 ('Datang 30 Menit sebelum pelayanan, Konfirmasi kehadiran dibagian pendaftaran dengan menunjukan bukti pendaftaran melalui Mobile JKN, Terima Kasih..') as keterangan
                                 FROM jadwal
                                 INNER JOIN maping_poliklinik_pcare ON maping_poliklinik_pcare.kd_poli_rs=jadwal.kd_poli
@@ -283,15 +295,16 @@ if ($method == 'POST' && !empty($header['x-username']) && !empty($header['x-toke
                                 HAVING sisa_kouta > 0
                                 ORDER BY sisa_kouta DESC LIMIT 1"));
                     //validasi kouta
-				
+					$jam = fetch_array(bukaquery("SELECT jam_mulai FROM jadwal WHERE kd_dokter='$cek_kouta[kd_dokter]' and kd_poli='$decode[kodepoli]' AND hari_kerja LIKE '%$hari%' GROUP BY jam_mulai"));
+					$jam_mulai = $cek_kouta[0];
                 if (!empty($cek_kouta['sisa_kouta']) and $cek_kouta['sisa_kouta'] > 0) {
                         //cek data di SIMRS
                         $data = fetch_array(bukaquery("SELECT pasien.no_rkm_medis, pasien.no_ktp, pasien.no_peserta FROM pasien where pasien.no_ktp='$decode[nik]' and pasien.no_peserta='$decode[nomorkartu]'"));
                         // jika data valid atau ditemukan di SIMRS
                         if ($data['no_ktp'] != '') {
                             $noReg = noRegPoli($cek_kouta['kd_poli'], $decode['tanggalperiksa']);
-                            $query = bukaquery("insert into booking_registrasi set tanggal_booking=CURDATE(),jam_booking=CURTIME(), no_rkm_medis='$data[no_rkm_medis]',tanggal_periksa='$decode[tanggalperiksa]',"
-                                . "kd_dokter='$cek_kouta[kd_dokter]',kd_poli='$cek_kouta[kd_poli]',no_reg='$noReg',kd_pj='BPJ',limit_reg='1',waktu_kunjungan='$cek_kouta[jam_mulai]',status='Belum'");
+                            $query = bukaquery("insert into booking_registrasi set tanggal_booking=CURDATE(),jam_booking=CURTIME(),  no_rkm_medis='$data[no_rkm_medis]',tanggal_periksa='$decode[tanggalperiksa]',"
+                                . "kd_dokter='$cek_kouta[kd_dokter]',kd_poli='$cek_kouta[kd_poli]',no_reg='$noReg',kd_pj='BPJ',limit_reg='1',waktu_kunjungan='$jam_mulai[jam_mulai]',status='Belum'");
                             if ($query) {
                                 $response = array(
                                     'response' => array(
@@ -331,7 +344,7 @@ if ($method == 'POST' && !empty($header['x-username']) && !empty($header['x-toke
                     else {
                         $response = array(
                             'metadata' => array(
-                                'message' => "Poli Tidak Ditemukan",
+                                'message' => "Poli '.$decode[namapoli]' Tidak Ditemukan",
                                 'code' => 201
                             )
                         );
